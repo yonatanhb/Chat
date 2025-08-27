@@ -96,3 +96,12 @@ yarn.lock
 *.swp
 *.swo
 *~
+
+# Certificates
+certs/
+*.key
+*.pem
+*.p12
+*.pfx
+*.crt
+*.cer
