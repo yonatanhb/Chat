@@ -1,0 +1,15 @@
+fastapi
+uvicorn==0.17.6
+httptools
+watchfiles
+pydantic
+pydantic-settings
+python-dotenv
+sqlalchemy
+psycopg2-binary
+python-jose[cryptography]
+passlib[bcrypt]
+bcrypt==3.2.2
+python-multipart
+# Pin websockets to <11 to keep uvicorn 0.17 compatible
+websockets==10.4
