@@ -13,7 +13,7 @@ class Message(Base):
     recipient_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     content = Column(String, nullable=True)
     content_type = Column(
-        Enum("text", "image", name="content_type_enum"),
+        Enum("text", "image", "video", "file", name="content_type_enum"),
         default="text",
         nullable=False,
     )
