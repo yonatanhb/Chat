@@ -46,9 +46,9 @@ export function ChatPanel({
   return (
     <div
       ref={panelRef}
-      className="relative flex-1 min-h-0 min-w-0 max-w-[95%] flex flex-col rounded-lg border border-gray-300 bg-white shadow-sm overflow-hidden"
+      className="relative flex-1 min-h-0 min-w-0 max-w-[95%] flex flex-col rounded-lg border border-gray-300 bg-white shadow-sm overflow-hidden dark:bg-neutral-900 dark:border-neutral-800"
     >
-      <div className="flex items-center justify-between p-4 border-b">
+      <div className="flex items-center justify-between p-4 border-b dark:border-neutral-800">
         <div className="font-semibold text-base truncate">{title}</div>
         {actions && (
           <div className="shrink-0 flex items-center gap-2">{actions}</div>
@@ -57,10 +57,10 @@ export function ChatPanel({
       <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-4">
         {children}
       </div>
-      {footer && <div className="p-4 border-t">{footer}</div>}
+      {footer && <div className="p-4 border-t dark:border-neutral-800">{footer}</div>}
       {dragOver && (
         <div className="absolute inset-0 bg-blue-500/10 backdrop-blur-[1px] flex items-center justify-center pointer-events-none">
-          <div className="px-4 py-2 rounded-md bg-white/90 border text-sm">
+          <div className="px-4 py-2 rounded-md bg-white/90 border text-sm dark:bg-neutral-900/90 dark:border-neutral-700">
             שחרר כאן כדי לצרף קובץ
           </div>
         </div>

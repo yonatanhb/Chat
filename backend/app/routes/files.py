@@ -44,6 +44,7 @@ def _validate_mime(filename: str, mime_type: str, size_bytes: int) -> None:
         "application/x-bzip2",  # .bz2
         "application/x-bzip",  # .bz
         "application/x-xz",  # .xz
+        "text/plain",  # .txt
     }
     # Configurable max size (MB) via env var; default 200MB for enterprise use
     try:

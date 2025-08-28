@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { API_BASE, registerAccount as apiRegister, loginWithKey as apiLoginWithKey } from "../api";
-import { generateAndStoreKeypair, loadPrivateKeyFromPassword, getStoredPublicJwk } from "@/lib/e2ee";
+import { generateKeypair, persistKeypair, loadPrivateKeyFromPassword, getStoredPublicJwk } from "@/lib/e2ee";
 
 export function useAuth() {
   const [token, setToken] = useState<string | null>(() =>
@@ -55,17 +55,22 @@ export function useAuth() {
     }
   }, [])
 
-  const register = useCallback(async (payload: { username: string; first_name?: string; last_name?: string; password: string }) => {
+  const register = useCallback(async (payload: { username: string; first_name?: string; last_name?: string; password: string }): Promise<{ ok: boolean; message?: string }> => {
     setIsLoading(true)
     setError(null)
     try {
-      const { publicJwk } = await generateAndStoreKeypair(payload.password)
+      // 1) Generate keypair in-memory only
+      const { privateJwk, publicJwk } = await generateKeypair()
+      // 2) Attempt to register with public key
       await apiRegister({ ...payload, public_key_jwk: JSON.stringify(publicJwk) })
+      // 3) Only if registration succeeds, persist keys locally
+      await persistKeypair(payload.password, privateJwk, publicJwk)
       // Do not auto-login after register; caller decides navigation
-      return true
+      return { ok: true }
     } catch (e: any) {
-      setError(e?.message ?? 'Registration failed')
-      return false
+      const msg = e?.message ?? 'Registration failed'
+      setError(msg)
+      return { ok: false, message: msg }
     } finally {
       setIsLoading(false)
     }

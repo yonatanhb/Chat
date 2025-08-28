@@ -36,10 +36,10 @@ export function ChatInput({ value, onChange, onSend, disabled, onSendCode, onSen
             try { if (fileRef.current) fileRef.current.value = "" } catch {}
           }
         }} />
+        <Button type="submit" disabled={disabled || !value.trim()}>שליחה</Button>
         <Button type="button" variant="outline" disabled={disabled} onClick={() => fileRef.current?.click()} aria-label="צרף קובץ">
           <Paperclip className="h-4 w-4" />
         </Button>
-        <Button type="submit" disabled={disabled || !value.trim()}>שליחה</Button>
         <Button type="button" variant="outline" disabled={disabled} onClick={() => setShowCode(true)} aria-label="שליחת קוד">
           <FileCode className="h-4 w-4" />
         </Button>

@@ -13,9 +13,9 @@ from ..ws.ws_manager import manager
 async def register_user(db: Session, body: schemas.RegisterIn):
     existing = get_user_by_username(db, body.username)
     if existing:
-        raise HTTPException(status_code=400, detail="Username already exists")
+        raise HTTPException(status_code=400, detail="שם המשתמש כבר קיים")
     if not all([body.username.strip(), body.first_name.strip(), body.last_name.strip(), body.password.strip(), body.public_key_jwk.strip()]):
-        raise HTTPException(status_code=400, detail="All fields are required")
+        raise HTTPException(status_code=400, detail="כל השדות נדרשים")
     user = create_user(db, schemas.UserCreate(
         username=body.username,
         password=body.password,
