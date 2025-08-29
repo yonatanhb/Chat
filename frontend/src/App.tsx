@@ -1,19 +1,32 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "./hooks/useAuth";
 import { LoginForm } from "./components/LoginForm";
+import { RegisterForm } from "./components/RegisterForm";
 import { AuthenticatedApp } from "./components/AuthenticatedApp";
 import { SettingsView } from "./components/SettingsView";
 import { KeyImportView } from "./components/KeyImportView";
 import { ResetAccountView } from "./components/ResetAccountView";
 import { AdminPanel } from "./components/admin/AdminPanel";
-import { Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
+import {
+  Routes,
+  Route,
+  Navigate,
+  useLocation,
+  useNavigate,
+} from "react-router-dom";
 import { hasKeypair } from "@/lib/e2ee";
+
+const PUBLIC_UNAUTH_PATHS = new Set([
+  "/login",
+  "/register",
+  "/key-import",
+  "/reset-account",
+]);
 
 function App() {
   const { token, isLoading, error, autoAuth, logout } = useAuth();
   const [authTried, setAuthTried] = useState(false);
-  const [keyCheckDone, setKeyCheckDone] = useState(false);
-  const [hasLocalKeypair, setHasLocalKeypair] = useState<boolean | null>(null);
+  // Removed keypair bootstrap detection to simplify auth flow
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -21,52 +34,28 @@ function App() {
     autoAuth().finally(() => setAuthTried(true));
   }, [autoAuth]);
 
-  // Pre-check if local keypair exists to avoid UI flicker between /login and /register
+  // If unauthenticated and on /login without a local keypair, redirect to /register
   useEffect(() => {
-    (async () => {
-      try {
+    if (!token && location.pathname === "/login") {
+      (async () => {
         const has = await hasKeypair().catch(() => false as const);
-        setHasLocalKeypair(has);
-      } finally {
-        setKeyCheckDone(true);
-      }
-    })();
-  }, []);
-  // Redirect to /register if no JWT and no local keypair; otherwise keep /login
-  useEffect(() => {
-    if (!authTried || isLoading || !keyCheckDone) return;
-    if (token) return;
-    const has = !!hasLocalKeypair;
-    if (
-      !has &&
-      location.pathname !== "/register" &&
-      location.pathname !== "/key-import" &&
-      location.pathname !== "/reset-account"
-    ) {
-      navigate("/register", { replace: true });
+        if (!has) navigate("/register", { replace: true });
+      })();
     }
-    if (has && location.pathname === "/register") {
+  }, [token, location.pathname, navigate]);
+
+  // Removed keypair-based redirects to avoid conflicting navigation
+
+  // Hard guard: if logged out, force to /login (except public unauth paths)
+  useEffect(() => {
+    if (!authTried || isLoading) return;
+    if (!token && !PUBLIC_UNAUTH_PATHS.has(location.pathname)) {
       navigate("/login", { replace: true });
     }
-  }, [authTried, isLoading, token, keyCheckDone, hasLocalKeypair, navigate, location.pathname]);
-
-  // Hard guard: if logged out, force to /login (except on /login or /register)
-  useEffect(() => {
-    if (!authTried || isLoading || !keyCheckDone) return;
-    if (
-      !token &&
-      location.pathname !== "/login" &&
-      location.pathname !== "/register" &&
-      location.pathname !== "/key-import" &&
-      location.pathname !== "/reset-account"
-    ) {
-      navigate("/login", { replace: true });
-    }
-  }, [token, authTried, isLoading, keyCheckDone, location.pathname, navigate]);
-
+  }, [token, authTried, isLoading, location.pathname, navigate]);
 
   // During bootstrap, render a minimal splash to prevent login/register flip
-  const bootstrapping = !authTried || isLoading || !keyCheckDone;
+  const bootstrapping = !authTried || isLoading;
 
   return (
     <Routes>
@@ -107,7 +96,7 @@ function App() {
             ) : (
               <div className="min-h-screen flex items-center justify-center bg-background text-foreground p-4">
                 <div className="w-full max-w-md">
-                  <LoginForm error={error} forceMode="register" />
+                  <RegisterForm error={error} />
                 </div>
               </div>
             )
@@ -116,14 +105,35 @@ function App() {
           )
         }
       />
-      <Route path="/admin" element={token ? <AdminPanel /> : <Navigate to="/login" replace />} />
-      <Route path="/settings" element={token ? <SettingsView token={token} onLogout={logout} /> : <Navigate to="/login" replace />} />
+      <Route
+        path="/admin"
+        element={token ? <AdminPanel /> : <Navigate to="/login" replace />}
+      />
+      <Route
+        path="/settings"
+        element={
+          token ? (
+            <SettingsView token={token} onLogout={logout} />
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        }
+      />
       <Route path="/key-import" element={<KeyImportView />} />
       <Route path="/reset-account" element={<ResetAccountView />} />
-      <Route path="/" element={token ? <AuthenticatedApp token={token} onLogout={logout} /> : <Navigate to="/login" replace />} />
+      <Route
+        path="/"
+        element={
+          token ? (
+            <AuthenticatedApp token={token} onLogout={logout} />
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        }
+      />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }
 
-export default App
+export default App;

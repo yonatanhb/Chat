@@ -1,5 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { createPrivateChat, createGroupChat, publishPublicKey, addMembers, removeMembers, renameGroup } from "../api";
+import {
+  createPrivateChat,
+  createGroupChat,
+  publishPublicKey,
+  addMembers,
+  removeMembers,
+  renameGroup,
+} from "../api";
 import { getStoredPublicJwk } from "@/lib/e2ee";
 //
 import { getMe } from "@/api";
@@ -26,7 +33,14 @@ type Props = {
 // Chat type is used only for typing in hooks; keeping local participant type
 
 export function ChatView({ token, onLogout }: Props) {
-  const { chats, approvedUsers, unreadMap, setUnreadMap, loadChats, refreshLists } = useChatList(token);
+  const {
+    chats,
+    approvedUsers,
+    unreadMap,
+    setUnreadMap,
+    loadChats,
+    refreshLists,
+  } = useChatList(token);
   const [activeChatId, setActiveChatId] = useState<number | null>(null);
   const [input, setInput] = useState("");
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -37,11 +51,22 @@ export function ChatView({ token, onLogout }: Props) {
   const [refreshing, setRefreshing] = useState(false);
   const [onlineIds, setOnlineIds] = useState<Set<number>>(new Set());
   const [removedChatIds, setRemovedChatIds] = useState<Set<number>>(new Set());
+  const [lastIncomingAt, setLastIncomingAt] = useState<Record<number, number>>(
+    {}
+  );
   const [showGroupDialog, setShowGroupDialog] = useState(false);
   const [creatingGroup, setCreatingGroup] = useState(false);
   const [showMembersDialog, setShowMembersDialog] = useState(false);
   const { ensureGroupKey, groupKeyRef } = useGroupKey(token);
-  const { messages, messagesLoading, sendText, onSendAttachment, onDropFiles, firstUnreadIndex, appendSystemNotice } = useChatSocket({
+  const {
+    messages,
+    messagesLoading,
+    sendText,
+    onSendAttachment,
+    onDropFiles,
+    firstUnreadIndex,
+    appendSystemNotice,
+  } = useChatSocket({
     token,
     activeChatId,
     chats: chats as any,
@@ -54,12 +79,14 @@ export function ChatView({ token, onLogout }: Props) {
 
   const loadChatsWithDefault = useCallback(async () => {
     const data = (await loadChats()) as any[];
-    if (data && data.length > 0 && activeChatId == null) setActiveChatId(data[0].id);
+    if (data && data.length > 0 && activeChatId == null)
+      setActiveChatId(data[0].id);
   }, [loadChats, activeChatId]);
 
   useNotifySocket(token, {
     activeChatIdRef,
-    onUnreadUpdate: (chatId) => setUnreadMap((prev) => ({ ...prev, [chatId]: 0 })),
+    onUnreadUpdate: (chatId) =>
+      setUnreadMap((prev) => ({ ...prev, [chatId]: 0 })),
     onRemovedFromChat: (chatId) => {
       try {
         const curr = activeChatIdRef.current;
@@ -73,14 +100,16 @@ export function ChatView({ token, onLogout }: Props) {
         });
       } catch {}
     },
-    onNewMessage: (chatId) =>
+    onNewMessage: (chatId) => {
+      setLastIncomingAt((prev) => ({ ...prev, [chatId]: Date.now() }));
       setUnreadMap((prev) => {
         const curr = activeChatIdRef.current;
         if (curr && chatId === curr) return prev;
         const next = { ...prev };
         next[chatId] = (next[chatId] ?? 0) + 1;
         return next;
-      }),
+      });
+    },
     onUsersChanged: () => refreshLists(),
     onChatsChanged: () => refreshLists(),
   });
@@ -114,6 +143,27 @@ export function ChatView({ token, onLogout }: Props) {
       } catch {}
     };
   }, [token, refreshLists]);
+
+  // Hydrate lastIncomingAt from localStorage on mount
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("chat_last_incoming");
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === "object") setLastIncomingAt(parsed);
+      }
+    } catch {}
+  }, []);
+
+  // Persist lastIncomingAt to localStorage on change
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        "chat_last_incoming",
+        JSON.stringify(lastIncomingAt)
+      );
+    } catch {}
+  }, [lastIncomingAt]);
 
   useEffect(() => {
     (async () => {
@@ -152,6 +202,7 @@ export function ChatView({ token, onLogout }: Props) {
         search={search}
         setSearch={setSearch}
         unreadMap={unreadMap}
+        lastIncomingAt={lastIncomingAt}
         onlineIds={onlineIds}
         refreshing={refreshing}
         onRefresh={async () => {
@@ -240,10 +291,18 @@ export function ChatView({ token, onLogout }: Props) {
           {messagesLoading ? (
             <div className="w-full max-w-full flex-1 overflow-y-auto space-y-2 pr-2 pl-2 box-border animate-pulse">
               <div className="h-4 bg-gray-200 dark:bg-neutral-800 rounded w-28 mx-auto my-3" />
-              <div className="flex justify-start"><div className="bg-gray-200 dark:bg-neutral-800 rounded-2xl rounded-br-none h-10 w-2/3" /></div>
-              <div className="flex justify-end"><div className="bg-gray-300 dark:bg-neutral-700 rounded-2xl rounded-bl-none h-6 w-1/2" /></div>
-              <div className="flex justify-start"><div className="bg-gray-200 dark:bg-neutral-800 rounded-2xl rounded-br-none h-16 w-3/4" /></div>
-              <div className="flex justify-end"><div className="bg-gray-300 dark:bg-neutral-700 rounded-2xl rounded-bl-none h-12 w-1/3" /></div>
+              <div className="flex justify-start">
+                <div className="bg-gray-200 dark:bg-neutral-800 rounded-2xl rounded-br-none h-10 w-2/3" />
+              </div>
+              <div className="flex justify-end">
+                <div className="bg-gray-300 dark:bg-neutral-700 rounded-2xl rounded-bl-none h-6 w-1/2" />
+              </div>
+              <div className="flex justify-start">
+                <div className="bg-gray-200 dark:bg-neutral-800 rounded-2xl rounded-br-none h-16 w-3/4" />
+              </div>
+              <div className="flex justify-end">
+                <div className="bg-gray-300 dark:bg-neutral-700 rounded-2xl rounded-bl-none h-12 w-1/3" />
+              </div>
             </div>
           ) : (
             <ChatMessages
@@ -260,7 +319,9 @@ export function ChatView({ token, onLogout }: Props) {
                 const chat = chats.find((c: any) => c.id === activeChatId);
                 if (!chat) return null;
                 if (chat.chat_type === "private") {
-                  const other = chat.participants.find((p: any) => p.id !== myId);
+                  const other = chat.participants.find(
+                    (p: any) => p.id !== myId
+                  );
                   return other?.id ?? myId ?? null;
                 }
                 return null;
