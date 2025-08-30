@@ -22,19 +22,12 @@ export async function getChats(token: string) {
       chat_type: string;
       participants: { id: number; username: string }[];
       title?: string;
+      is_pinned: boolean;
     }>
   >;
 }
 
-export function buildWsUrl(chatId: number, token: string): string {
-  return `${WS_BASE}/ws/${chatId}/${token}`;
-}
-
-export function buildNotifyWsUrl(token: string): string {
-  // Use query param to avoid path routing constraints and URL encoding issues
-  const qs = new URLSearchParams({ token }).toString();
-  return `${WS_BASE}/ws/notify?${qs}`;
-}
+// Legacy WS URL helpers removed after migrating to unified socket
 
 export async function getMe(token: string) {
   const res = await fetch(`${API_BASE}/users/me/`, {
@@ -551,5 +544,70 @@ export async function sendMessageWithAttachment(
       nonce: string;
       algo: string;
     } | null;
+  }>;
+}
+
+// Pinned Chats API - now integrated into /chats endpoint
+// Pin/Unpin operations still use dedicated endpoints
+export async function pinChat(token: string, chatId: number) {
+  const res = await fetch(`${API_BASE}/user-settings/pin-chat`, {
+    method: "POST",
+    headers: { ...authHeader(token), "Content-Type": "application/json" },
+    body: JSON.stringify({ chat_id: chatId }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({} as any));
+    throw new Error(err?.detail ?? "Failed to pin chat");
+  }
+  return res.json() as Promise<{ message: string }>;
+}
+
+export async function unpinChat(token: string, chatId: number) {
+  const res = await fetch(`${API_BASE}/user-settings/unpin-chat`, {
+    method: "POST",
+    headers: { ...authHeader(token), "Content-Type": "application/json" },
+    body: JSON.stringify({ chat_id: chatId }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({} as any));
+    throw new Error(err?.detail ?? "Failed to unpin chat");
+  }
+  return res.json() as Promise<{ message: string }>;
+}
+
+// User Settings API
+export async function getUserSettings(token: string) {
+  const res = await fetch(`${API_BASE}/user-settings/`, {
+    headers: authHeader(token),
+  });
+  if (!res.ok) throw new Error("Failed to load user settings");
+  return res.json() as Promise<{
+    id: number;
+    user_id: number;
+    pinned_chats_limit: number;
+    created_at: string;
+    updated_at: string | null;
+  }>;
+}
+
+export async function updateUserSettings(
+  token: string,
+  settings: { pinned_chats_limit?: number }
+) {
+  const res = await fetch(`${API_BASE}/user-settings/`, {
+    method: "PUT",
+    headers: { ...authHeader(token), "Content-Type": "application/json" },
+    body: JSON.stringify(settings),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({} as any));
+    throw new Error(err?.detail ?? "Failed to update user settings");
+  }
+  return res.json() as Promise<{
+    id: number;
+    user_id: number;
+    pinned_chats_limit: number;
+    created_at: string;
+    updated_at: string | null;
   }>;
 }

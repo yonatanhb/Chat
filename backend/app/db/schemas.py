@@ -106,6 +106,7 @@ class ChatOut(BaseModel):
     admin_user_id: Optional[int] = None
     participants: List[UserBasic] = []
     title: Optional[str] = None
+    is_pinned: bool = False
 
     class Config:
         from_attributes = True
@@ -262,5 +263,51 @@ class GroupKeyWrapOut(BaseModel):
 class LoginWithKeyIn(BaseModel):
     public_key_jwk: str
     password: str
+
+
+# Pinned Chat Schemas
+class PinnedChatBase(BaseModel):
+    chat_id: int
+
+
+class PinnedChatCreate(PinnedChatBase):
+    pass
+
+
+class PinnedChat(PinnedChatBase):
+    id: int
+    user_id: int
+    pinned_at: datetime.datetime
+
+    class Config:
+        from_attributes = True
+
+
+# User Settings Schemas
+class UserSettingsBase(BaseModel):
+    pinned_chats_limit: int
+
+
+class UserSettingsCreate(UserSettingsBase):
+    pass
+
+
+class UserSettingsUpdate(BaseModel):
+    pinned_chats_limit: Optional[int] = None
+
+
+class UserSettings(UserSettingsBase):
+    id: int
+    user_id: int
+    created_at: datetime.datetime
+    updated_at: Optional[datetime.datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+# Update User schema to include settings
+class UserWithSettings(User):
+    settings: Optional[UserSettings] = None
 
 

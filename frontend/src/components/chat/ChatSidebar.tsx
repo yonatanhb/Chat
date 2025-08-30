@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { RefreshCcw, LogOut, Settings } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { MdOutlineGroupAdd } from "react-icons/md";
+import { toast } from "sonner";
 
 type ChatParticipant = { id: number; username: string };
 
@@ -15,6 +16,7 @@ type Chat = {
   title?: string;
   name?: string | null;
   admin_user_id?: number | null;
+  is_pinned: boolean;
 };
 
 export function ChatSidebar({
@@ -29,6 +31,7 @@ export function ChatSidebar({
   unreadMap,
   lastIncomingAt,
   onlineIds,
+  loading,
   refreshing,
   onRefresh,
   onOpenCreateGroup,
@@ -37,6 +40,11 @@ export function ChatSidebar({
   loadChats,
   createPrivateChat,
   onLogout,
+  invalidateChatsCache,
+  pinnedChatIds,
+  maxPinnedChats,
+  pinChat,
+  unpinChat,
 }: {
   chats: Chat[];
   approvedUsers: Array<{
@@ -54,6 +62,7 @@ export function ChatSidebar({
   unreadMap: Record<number, number>;
   lastIncomingAt: Record<number, number>;
   onlineIds: Set<number>;
+  loading: boolean;
   refreshing: boolean;
   onRefresh: () => Promise<void> | void;
   onOpenCreateGroup: () => void;
@@ -62,6 +71,11 @@ export function ChatSidebar({
   loadChats: () => Promise<void>;
   createPrivateChat: (token: string, userId: number) => Promise<{ id: number }>;
   onLogout: () => void;
+  invalidateChatsCache: () => void;
+  pinnedChatIds: number[];
+  maxPinnedChats: number;
+  pinChat: (chatId: number) => Promise<boolean>;
+  unpinChat: (chatId: number) => Promise<void>;
 }) {
   const navigate = useNavigate();
   const unifiedItems = useMemo(() => {
@@ -90,6 +104,22 @@ export function ChatSidebar({
         return tb - ta;
       });
     let items = filterTab === "groups" ? groups : [...privates, ...groups];
+
+    // Sort by pinned chats first, then by last activity
+    items.sort((a, b) => {
+      const aIsPinned = a.chatId ? pinnedChatIds.includes(a.chatId) : false;
+      const bIsPinned = b.chatId ? pinnedChatIds.includes(b.chatId) : false;
+
+      // Pinned chats come first
+      if (aIsPinned && !bIsPinned) return -1;
+      if (!aIsPinned && bIsPinned) return 1;
+
+      // If both are pinned or both are not pinned, sort by last activity
+      const ta = a.chatId ? lastIncomingAt[a.chatId] ?? 0 : 0;
+      const tb = b.chatId ? lastIncomingAt[b.chatId] ?? 0 : 0;
+      return tb - ta;
+    });
+
     const q = search.trim().toLowerCase();
     if (q)
       items = items.filter((it) => it.displayName.toLowerCase().includes(q));
@@ -143,67 +173,125 @@ export function ChatSidebar({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
+
           <ul className="space-y-1">
-            {unifiedItems.map((it) => {
-              const key =
-                (it as any).kind === "group"
-                  ? `group-${(it as any).chatId}`
-                  : `private-${(it as any).userId}-${
-                      (it as any).chatId ?? "new"
-                    }`;
-              return (
-                <li key={key}>
-                  <Button
-                    variant={
-                      "chatId" in it &&
-                      (it as any).chatId &&
-                      activeChatId === (it as any).chatId
-                        ? "default"
-                        : "ghost"
-                    }
-                    className="w-full justify-between"
-                    onClick={async () => {
-                      if ((it as any).kind === "group") {
-                        setActiveChatId((it as any).chatId);
-                      } else {
-                        const existing = (it as any).chatId;
-                        if (existing) {
-                          setActiveChatId(existing);
-                        } else {
-                          const chat = await createPrivateChat(
-                            token,
-                            (it as any).userId
-                          );
-                          setActiveChatId(chat.id);
-                          await loadChats();
+            {loading && (
+              <>
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <li key={`skeleton-${i}`}>
+                    <div className="w-full h-10 rounded bg-muted animate-pulse" />
+                  </li>
+                ))}
+              </>
+            )}
+            {!loading &&
+              unifiedItems.map((it) => {
+                const key =
+                  (it as any).kind === "group"
+                    ? `group-${(it as any).chatId}`
+                    : `private-${(it as any).userId}-${
+                        (it as any).chatId ?? "new"
+                      }`;
+                return (
+                  <li key={key}>
+                    <div className="group flex items-center gap-1">
+                      <Button
+                        variant={
+                          "chatId" in it &&
+                          (it as any).chatId &&
+                          activeChatId === (it as any).chatId
+                            ? "default"
+                            : "ghost"
                         }
-                      }
-                    }}
-                  >
-                    <span className="inline-flex items-center">
-                      {(it as any).kind === "private" && (
-                        <span
-                          className={`ml-2 inline-block h-2 w-2 rounded-full ${
-                            onlineIds.has((it as any).userId)
-                              ? "bg-emerald-500"
-                              : "bg-gray-300"
+                        className="flex-1 justify-between"
+                        onClick={async () => {
+                          if ((it as any).kind === "group") {
+                            setActiveChatId((it as any).chatId);
+                          } else {
+                            const existing = (it as any).chatId;
+                            if (existing) {
+                              setActiveChatId(existing);
+                            } else {
+                              invalidateChatsCache();
+                              const chat = await createPrivateChat(
+                                token,
+                                (it as any).userId
+                              );
+                              setActiveChatId(chat.id);
+                              await loadChats();
+                            }
+                          }
+                        }}
+                      >
+                        <span className="inline-flex items-center gap-1">
+                          {(it as any).kind === "private" && (
+                            <span
+                              className={`ml-2 inline-block h-2 w-2 rounded-full ${
+                                onlineIds.has((it as any).userId)
+                                  ? "bg-emerald-500"
+                                  : "bg-gray-300"
+                              }`}
+                            />
+                          )}
+                          {it.displayName}
+                          {(it as any).kind === "group" ? " · קבוצה" : ""}
+                        </span>
+                        <span className="ml-2 text-xs text-muted-foreground">
+                          {"chatId" in it &&
+                          (it as any).chatId &&
+                          unreadMap[(it as any).chatId]
+                            ? unreadMap[(it as any).chatId]
+                            : ""}
+                        </span>
+                      </Button>
+
+                      {/* Pin/Unpin button - show on hover or always if pinned */}
+                      {(it as any).chatId && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className={`h-8 w-8 shrink-0 transition-opacity duration-200 ${
+                            pinnedChatIds.includes((it as any).chatId)
+                              ? "opacity-100" // Always visible if pinned
+                              : "opacity-0 group-hover:opacity-100" // Only on hover if not pinned
                           }`}
-                        />
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            const chatId = (it as any).chatId;
+                            if (pinnedChatIds.includes(chatId)) {
+                              await unpinChat(chatId);
+                            } else {
+                              const success = await pinChat(chatId);
+                              if (!success) {
+                                toast.error(
+                                  `הגעת למקסימום צ'אטים מועדפים (${maxPinnedChats}). בטל נעיצה מצ'אט אחר כדי להוסיף חדש.`
+                                );
+                              }
+                            }
+                          }}
+                          title={
+                            pinnedChatIds.includes((it as any).chatId)
+                              ? "בטל נעיצה"
+                              : `נעוץ צ'אט (${
+                                  maxPinnedChats - pinnedChatIds.length
+                                } נותרו)`
+                          }
+                        >
+                          <span
+                            className={`text-sm ${
+                              pinnedChatIds.includes((it as any).chatId)
+                                ? "text-blue-500"
+                                : "text-muted-foreground"
+                            }`}
+                          >
+                            📌
+                          </span>
+                        </Button>
                       )}
-                      {it.displayName}
-                      {(it as any).kind === "group" ? " · קבוצה" : ""}
-                    </span>
-                    <span className="ml-2 text-xs text-muted-foreground">
-                      {"chatId" in it &&
-                      (it as any).chatId &&
-                      unreadMap[(it as any).chatId]
-                        ? unreadMap[(it as any).chatId]
-                        : ""}
-                    </span>
-                  </Button>
-                </li>
-              );
-            })}
+                    </div>
+                  </li>
+                );
+              })}
           </ul>
         </CardContent>
       </Card>

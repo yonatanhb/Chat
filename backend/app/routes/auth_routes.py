@@ -12,7 +12,7 @@ from ..controllers import auth_controller
 router = APIRouter()
 
 
-@router.post("/auth/register", response_model=schemas.Token)
+@router.post("/auth/register")
 async def register_user(body: schemas.RegisterIn, db: Session = Depends(get_db)):
     return await auth_controller.register_user(db, body)
 

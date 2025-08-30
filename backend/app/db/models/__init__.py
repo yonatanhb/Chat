@@ -7,6 +7,8 @@ from .user_chat_state import UserChatState
 from .user_public_key import UserPublicKey
 from .group_key_share import GroupKeyShare
 from .attachment import Attachment
+from .user_settings import UserSettings
+from .pinned_chat import PinnedChat
 
 __all__ = [
     "Base",
@@ -18,6 +20,8 @@ __all__ = [
     "UserPublicKey",
     "GroupKeyShare",
     "Attachment",
+    "UserSettings",
+    "PinnedChat",
 ]
 
 

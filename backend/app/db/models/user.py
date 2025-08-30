@@ -28,5 +28,7 @@ class User(Base):
         back_populates="recipient",
     )
     chats = relationship("Chat", secondary=chat_users_table, back_populates="participants")
+    settings = relationship("UserSettings", back_populates="user", uselist=False)
+    pinned_chats = relationship("PinnedChat", back_populates="user")
 
 

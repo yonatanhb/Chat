@@ -12,6 +12,7 @@ from .routes.chats import router as chats_router
 from .routes.admin import router as admin_router
 from .routes.users import router as users_router
 from .routes.crypto import router as crypto_router
+from .routes.user_settings import router as user_settings_router
 from .ws.sockets import ws_router
 
 models.Base.metadata.create_all(bind=engine)
@@ -36,6 +37,7 @@ app.include_router(auth_router)
 app.include_router(chats_router)
 app.include_router(admin_router)
 app.include_router(users_router)
+app.include_router(user_settings_router)
 app.include_router(ws_router)
 app.include_router(crypto_router)
 

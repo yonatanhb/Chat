@@ -26,13 +26,13 @@ async def register_user(db: Session, body: schemas.RegisterIn):
         signup_ip=None,
     ))
     upsert_user_public_key(db, user.id, body.public_key_jwk, body.algorithm)
-    token = auth.create_access_token({"sub": user.username})
     try:
-        # notify all so clients refresh and publish public keys
-        await manager.notify_all(json.dumps({"type": "users_changed"}))
+        # notify all unified WS clients to refresh users list / presence
+        await manager.unified_broadcast_all(json.dumps({"v": 1, "type": "users_changed"}))
     except Exception:
         pass
-    return {"access_token": token, "token_type": "bearer"}
+    # Do not return JWT on registration; just a success acknowledgement
+    return {"success": True}
 
 
 async def login_with_key(db: Session, body: schemas.LoginWithKeyIn):

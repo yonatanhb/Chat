@@ -87,7 +87,7 @@ async def create_or_get_private_chat(body: schemas.PrivateChatRequest, db: Sessi
     try:
         import json as _json
         for uid in needed_ids:
-            await manager.notify_user(uid, _json.dumps({"type": "chats_changed"}))
+            await manager.unified_notify_user(uid, _json.dumps({"v": 1, "type": "chats_changed"}))
     except Exception:
         pass
     return chat
@@ -107,9 +107,9 @@ async def create_new_chat(chat: schemas.ChatCreate, db: Session = Depends(get_db
     try:
         if c.chat_type == 'group':
             for u in c.participants:
-                await manager.notify_user(u.id, json.dumps({"type": "chats_changed"}))
+                await manager.unified_notify_user(u.id, json.dumps({"v": 1, "type": "chats_changed"}))
         else:
-            await manager.notify_all(json.dumps({"type": "chats_changed"}))
+            await manager.unified_broadcast_all(json.dumps({"v": 1, "type": "chats_changed"}))
     except Exception:
         pass
     return schemas.ChatOut(
@@ -141,6 +141,18 @@ def get_user_chats(db: Session = Depends(get_db), current_user: schemas.User = D
             db.commit()
             db.refresh(chat)
         existing = chats_controller.get_chats_for_user(db=db, user_id=current_user.id)
+    
+    # Get pinned chat IDs for current user
+    pinned_chat_ids = set()
+    try:
+        pinned_chats = db.query(models.PinnedChat.chat_id).filter(
+            models.PinnedChat.user_id == current_user.id
+        ).all()
+        pinned_chat_ids = {pc.chat_id for pc in pinned_chats}
+    except Exception:
+        # If PinnedChat table doesn't exist yet, just continue
+        pass
+    
     result: list[schemas.ChatOut] = []
     for c in existing:
         title = None
@@ -160,6 +172,7 @@ def get_user_chats(db: Session = Depends(get_db), current_user: schemas.User = D
             name=c.name,
             participants=[schemas.UserBasic(id=u.id, username=u.username) for u in c.participants],
             title=title,
+            is_pinned=c.id in pinned_chat_ids,
         )
         result.append(out)
     return result
@@ -203,7 +216,7 @@ async def create_message(chat_id: int, body: schemas.MessageCreate, db: Session 
         # notify only chat participants except sender
         participant_ids = [u.id for u in chat.participants if u.id != current_user.id]
         for uid in participant_ids:
-            await manager.notify_user(uid, _json.dumps({"type": "new_message", "chat_id": chat_id}))
+            await manager.unified_notify_user(uid, _json.dumps({"v": 1, "type": "new_message", "chat_id": chat_id}))
     except Exception:
         pass
     return schemas.MessageOut(
@@ -249,7 +262,7 @@ async def set_read_state(chat_id: int, last_read_message_id: Optional[int] = Non
     # notify this user's other sessions to reset unread count
     try:
         import json as _json
-        await manager.notify_user(current_user.id, _json.dumps({"type": "unread_update", "chat_id": chat_id}))
+        await manager.unified_notify_user(current_user.id, _json.dumps({"v": 1, "type": "unread_update", "chat_id": chat_id}))
     except Exception:
         pass
     return schemas.UserChatStateOut(chat_id=chat_id, last_read_message_id=st.last_read_message_id)
@@ -301,9 +314,9 @@ async def remove_chat_members(chat_id: int, body: schemas.RemoveMembersRequest, 
             # disconnect from room
             manager.disconnect_user_from_room(str(chat_id), uid)
             # notify their notify sockets to clear badge for this chat
-            await manager.notify_user(uid, _json.dumps({"type": "unread_update", "chat_id": chat_id}))
+            await manager.unified_notify_user(uid, _json.dumps({"v": 1, "type": "unread_update", "chat_id": chat_id}))
             # also notify user they were removed from this chat
-            await manager.notify_user(uid, _json.dumps({"type": "removed_from_chat", "chat_id": chat_id}))
+            await manager.unified_notify_user(uid, _json.dumps({"v": 1, "type": "removed_from_chat", "chat_id": chat_id}))
     except Exception:
         pass
     return {"id": updated.id}
