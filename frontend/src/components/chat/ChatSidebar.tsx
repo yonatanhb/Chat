@@ -79,23 +79,43 @@ export function ChatSidebar({
 }) {
   const navigate = useNavigate();
   const unifiedItems = useMemo(() => {
-    // Use sortedChats from the hook (already sorted by pinned first)
-    const groups = chats
-      .filter((c) => c.chat_type === "group")
-      .map((c) => ({
-        kind: "group" as const,
-        chatId: c.id,
-        displayName: c.title || `קבוצה #${c.id}`,
-      }));
+    // Simple approach: convert sorted chats directly to display format
+    const chatItems: Array<{
+      kind: "group" | "private";
+      chatId?: number;
+      displayName: string;
+      userId?: number;
+    }> = [];
 
-    const privates = approvedUsers.map((u) => ({
-      kind: "private" as const,
-      userId: u.user_id,
-      displayName: u.is_self ? "צ'אט עם עצמי" : u.username,
-      chatId: u.chat_id ?? undefined,
-    }));
+    // First, add all chats in their sorted order (pinned first)
+    chats.forEach((chat) => {
+      chatItems.push({
+        kind: chat.chat_type as "group" | "private",
+        chatId: chat.id,
+        displayName:
+          chat.title ||
+          (chat.chat_type === "group"
+            ? `קבוצה #${chat.id}`
+            : `צ'אט פרטי #${chat.id}`),
+      });
+    });
 
-    let items = filterTab === "groups" ? groups : [...privates, ...groups];
+    // Then add approved users that don't have existing chats
+    approvedUsers.forEach((user) => {
+      if (!user.chat_id) {
+        chatItems.push({
+          kind: "private",
+          userId: user.user_id,
+          displayName: user.is_self ? "צ'אט עם עצמי" : user.username,
+          chatId: undefined,
+        });
+      }
+    });
+
+    let items =
+      filterTab === "groups"
+        ? chatItems.filter((item) => item.kind === "group")
+        : chatItems;
 
     // Apply search filter
     const q = search.trim().toLowerCase();
