@@ -102,17 +102,20 @@ export function ChatView({ token, onLogout }: Props) {
 
   const loadChatsWithDefault = useCallback(async () => {
     await loadChats();
-    // After loading, set first chat as active if none is selected
-    if (chats.length > 0 && activeChatId == null) {
-      setActiveChatId(chats[0].id);
-    }
-  }, [loadChats, chats, activeChatId]);
+  }, [loadChats]);
 
   // notify merged into unified socket
 
   useEffect(() => {
     loadChatsWithDefault();
   }, [loadChatsWithDefault]);
+
+  // Set first chat as active if none is selected and chats are loaded
+  useEffect(() => {
+    if (chats.length > 0 && activeChatId == null) {
+      setActiveChatId(chats[0].id);
+    }
+  }, [chats, activeChatId]);
 
   useEffect(() => {
     activeChatIdRef.current = activeChatId;

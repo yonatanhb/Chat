@@ -79,52 +79,32 @@ export function ChatSidebar({
 }) {
   const navigate = useNavigate();
   const unifiedItems = useMemo(() => {
-    const groups = (chats as any[])
+    // Use sortedChats from the hook (already sorted by pinned first)
+    const groups = chats
       .filter((c) => c.chat_type === "group")
       .map((c) => ({
         kind: "group" as const,
         chatId: c.id,
-        displayName: (c as any).title || `קבוצה #${c.id}`,
-      }))
-      .sort((a, b) => {
-        const ta = a.chatId ? lastIncomingAt[a.chatId] ?? 0 : 0;
-        const tb = b.chatId ? lastIncomingAt[b.chatId] ?? 0 : 0;
-        return tb - ta;
-      });
-    const privates = approvedUsers
-      .map((u) => ({
-        kind: "private" as const,
-        userId: u.user_id,
-        displayName: u.is_self ? "צ'אט עם עצמי" : u.username,
-        chatId: u.chat_id ?? undefined,
-      }))
-      .sort((a, b) => {
-        const ta = a.chatId ? lastIncomingAt[a.chatId] ?? 0 : 0;
-        const tb = b.chatId ? lastIncomingAt[b.chatId] ?? 0 : 0;
-        return tb - ta;
-      });
+        displayName: c.title || `קבוצה #${c.id}`,
+      }));
+
+    const privates = approvedUsers.map((u) => ({
+      kind: "private" as const,
+      userId: u.user_id,
+      displayName: u.is_self ? "צ'אט עם עצמי" : u.username,
+      chatId: u.chat_id ?? undefined,
+    }));
+
     let items = filterTab === "groups" ? groups : [...privates, ...groups];
 
-    // Sort by pinned chats first, then by last activity
-    items.sort((a, b) => {
-      const aIsPinned = a.chatId ? pinnedChatIds.includes(a.chatId) : false;
-      const bIsPinned = b.chatId ? pinnedChatIds.includes(b.chatId) : false;
-
-      // Pinned chats come first
-      if (aIsPinned && !bIsPinned) return -1;
-      if (!aIsPinned && bIsPinned) return 1;
-
-      // If both are pinned or both are not pinned, sort by last activity
-      const ta = a.chatId ? lastIncomingAt[a.chatId] ?? 0 : 0;
-      const tb = b.chatId ? lastIncomingAt[b.chatId] ?? 0 : 0;
-      return tb - ta;
-    });
-
+    // Apply search filter
     const q = search.trim().toLowerCase();
-    if (q)
+    if (q) {
       items = items.filter((it) => it.displayName.toLowerCase().includes(q));
+    }
+
     return items;
-  }, [approvedUsers, chats, filterTab, search, myId, lastIncomingAt]);
+  }, [chats, approvedUsers, filterTab, search]);
 
   return (
     <aside className="border-l p-4 space-y-3 min-h-0 overflow-y-auto flex flex-col">

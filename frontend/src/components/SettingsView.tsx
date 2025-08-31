@@ -120,7 +120,7 @@ export function SettingsView({ token, onLogout }: Props) {
           </div>
         </section>
 
-        <section className="rounded-lg border p-4 space-y-3">
+        {/* <section className="rounded-lg border p-4 space-y-3">
           <div className="font-medium inline-flex items-center gap-2">
             <Pin className="h-4 w-4" /> הגדרות צ'אטים מועדפים
           </div>
@@ -146,7 +146,7 @@ export function SettingsView({ token, onLogout }: Props) {
               {isUpdating ? "מעדכן..." : "עדכן הגדרות"}
             </Button>
           </div>
-        </section>
+        </section> */}
       </div>
     </div>
   );
