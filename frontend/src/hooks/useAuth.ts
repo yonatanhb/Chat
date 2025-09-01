@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { API_BASE, registerAccount as apiRegister, loginWithKey as apiLoginWithKey } from "../api";
+import { API_BASE, registerAccount as apiRegister, loginWithKey as apiLoginWithKey, clearPublicKeyCache } from "../api";
 import { generateKeypair, persistKeypair, loadPrivateKeyFromPassword, getStoredPublicJwk } from "@/lib/e2ee";
 
 export function useAuth() {
@@ -113,6 +113,8 @@ export function useAuth() {
 
   const logout = useCallback(() => {
     saveToken(null);
+    // Clear public key cache on logout
+    clearPublicKeyCache();
   }, [saveToken]);
 
   return useMemo(

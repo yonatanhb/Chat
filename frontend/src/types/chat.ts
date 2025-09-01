@@ -7,6 +7,13 @@ export type Attachment = {
   algo: string;
 };
 
+export type ChatParticipant = {
+  id: number;
+  username: string;
+  first_name?: string | null;
+  last_name?: string | null;
+};
+
 export type Message = {
   id: number;
   content: string | null;
@@ -15,5 +22,3 @@ export type Message = {
   timestamp?: string;
   attachment?: Attachment | null;
 };
-
-

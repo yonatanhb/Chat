@@ -22,8 +22,6 @@ async def register_user(db: Session, body: schemas.RegisterIn):
         role="user",
         first_name=body.first_name,
         last_name=body.last_name,
-        signup_at=None,
-        signup_ip=None,
     ))
     upsert_user_public_key(db, user.id, body.public_key_jwk, body.algorithm)
     try:

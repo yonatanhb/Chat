@@ -165,12 +165,22 @@ def get_user_chats(db: Session = Depends(get_db), current_user: schemas.User = D
                     title = f"צ'אט עם {other.username}"
         else:
             title = c.name or f"צ'אט עם {len(c.participants)} משתתפים"
+        # Get participant details for private chats
+        participant_details = []
+        for u in c.participants:
+            participant_details.append(schemas.UserBasic(
+                id=u.id, 
+                username=u.username,
+                first_name=getattr(u, 'first_name', None),
+                last_name=getattr(u, 'last_name', None)
+            ))
+        
         out = schemas.ChatOut(
             id=c.id,
             chat_type=c.chat_type,
             admin_user_id=getattr(c, "admin_user_id", None),
             name=c.name,
-            participants=[schemas.UserBasic(id=u.id, username=u.username) for u in c.participants],
+            participants=participant_details,
             title=title,
             is_pinned=c.id in pinned_chat_ids,
         )

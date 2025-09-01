@@ -21,8 +21,8 @@ def create_user(db: Session, user: schemas.UserCreate):
         role=user.role,
         first_name=user.first_name,
         last_name=user.last_name,
-        signup_ip=user.signup_ip,
-        signup_at=user.signup_at,
+        # signup_ip and signup_at will be set to None by default
+        # These fields are typically set by the system, not during user creation
     )
     db.add(db_user)
     db.commit()

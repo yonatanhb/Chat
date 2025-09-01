@@ -6,6 +6,7 @@ import {
   addMembers,
   removeMembers,
   renameGroup,
+  clearPublicKeyCache,
 } from "../api";
 import { getStoredPublicJwk } from "@/lib/e2ee";
 //
@@ -80,7 +81,11 @@ export function ChatView({ token, onLogout }: Props) {
     groupKeyRef,
     setUnreadMap,
     setOnlineIds,
-    onUsersChanged: () => refreshLists(),
+    onUsersChanged: () => {
+      // Clear public key cache when users change (keys might have changed)
+      clearPublicKeyCache();
+      refreshLists();
+    },
     onChatsChanged: () => {
       invalidateChatsCache();
       return refreshLists();
@@ -128,7 +133,11 @@ export function ChatView({ token, onLogout }: Props) {
       const publish = async () => {
         try {
           const pub = await getStoredPublicJwk();
-          if (pub) await publishPublicKey(token, JSON.stringify(pub));
+          if (pub) {
+            await publishPublicKey(token, JSON.stringify(pub));
+            // Clear cache when publishing new public key
+            clearPublicKeyCache();
+          }
         } catch {}
       };
       handler = () => publish();
@@ -238,21 +247,24 @@ export function ChatView({ token, onLogout }: Props) {
                   if (!chat) return `חדר #${activeChatId}`;
                   const typeLabel =
                     chat.chat_type === "private" ? "פרטי" : "קבוצה";
-                  const baseTitle = (chat as any).title
-                    ? `${(chat as any).title} | ${typeLabel}`
-                    : chat.chat_type === "private" &&
-                      myId &&
-                      Array.isArray(chat.participants)
-                    ? (() => {
-                        const other = chat.participants.find(
-                          (p: any) => p.id !== myId
-                        );
-                        const name = other?.username ?? "לא ידוע";
-                        return `צ'אט עם ${name} | ${typeLabel}`;
-                      })()
-                    : `צ'אט עם ${
-                        chat.participants?.length ?? 0
-                      } משתתפים | ${typeLabel}`;
+                  const baseTitle =
+                    chat.chat_type === "group" && chat.name
+                      ? `${chat.name} | ${typeLabel}`
+                      : chat.title
+                      ? `${chat.title} | ${typeLabel}`
+                      : chat.chat_type === "private" &&
+                        myId &&
+                        Array.isArray(chat.participants)
+                      ? (() => {
+                          const other = chat.participants.find(
+                            (p: any) => p.id !== myId
+                          );
+                          const name = other?.username ?? "לא ידוע";
+                          return `צ'אט עם ${name} | ${typeLabel}`;
+                        })()
+                      : `צ'אט עם ${
+                          chat.participants?.length ?? 0
+                        } משתתפים | ${typeLabel}`;
                   return (
                     <span className="inline-flex items-center gap-2">
                       {baseTitle}

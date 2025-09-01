@@ -12,7 +12,12 @@ import {
 type ChatRec = {
   id: number;
   chat_type: string;
-  participants: { id: number; username: string }[];
+  participants: {
+    id: number;
+    username: string;
+    first_name?: string | null;
+    last_name?: string | null;
+  }[];
   title?: string;
   name?: string | null;
   admin_user_id?: number | null;

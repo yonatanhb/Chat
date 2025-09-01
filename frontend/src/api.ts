@@ -20,8 +20,15 @@ export async function getChats(token: string) {
     Array<{
       id: number;
       chat_type: string;
-      participants: { id: number; username: string }[];
+      participants: {
+        id: number;
+        username: string;
+        first_name?: string | null;
+        last_name?: string | null;
+      }[];
       title?: string;
+      name?: string | null;
+      admin_user_id?: number | null;
       is_pinned: boolean;
     }>
   >;
@@ -410,16 +417,52 @@ export async function publishPublicKey(
   }>;
 }
 
+// Cache for public keys to avoid repeated API calls
+const publicKeyCache = new Map<number, {
+  user_id: number;
+  public_key_jwk: string;
+  algorithm: string;
+  timestamp: number;
+}>();
+
+// Cache TTL: 1 hour
+const PUBLIC_KEY_CACHE_TTL = 60 * 60 * 1000;
+
+// Function to clear cache for a specific user or all users
+export function clearPublicKeyCache(userId?: number) {
+  if (userId) {
+    publicKeyCache.delete(userId);
+  } else {
+    publicKeyCache.clear();
+  }
+}
+
 export async function getPublicKey(token: string, userId: number) {
+  // Check cache first
+  const cached = publicKeyCache.get(userId);
+  if (cached && Date.now() - cached.timestamp < PUBLIC_KEY_CACHE_TTL) {
+    return cached;
+  }
+
+  // Fetch from API if not cached or expired
   const res = await fetch(`${API_BASE}/crypto/public-key/${userId}`, {
     headers: authHeader(token),
   });
   if (!res.ok) throw new Error("Failed to fetch key");
-  return res.json() as Promise<{
+  
+  const keyData = await res.json() as {
     user_id: number;
     public_key_jwk: string;
     algorithm: string;
-  }>;
+  };
+  
+  // Cache the result
+  publicKeyCache.set(userId, {
+    ...keyData,
+    timestamp: Date.now()
+  });
+  
+  return keyData;
 }
 
 export async function publishGroupKeyWrap(

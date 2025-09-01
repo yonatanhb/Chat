@@ -3,22 +3,22 @@ import datetime
 from typing import List, Optional
 
 
-class UserBase(BaseModel):
-    username: str
-    role: str = "user"
+# Base user fields that are common across all user schemas
+class UserNameFields(BaseModel):
     first_name: Optional[str] = None
     last_name: Optional[str] = None
-    signup_ip: Optional[str] = None
-    signup_at: Optional[datetime.datetime] = None
+
+class UserBase(UserNameFields):
+    username: str
+    role: str = "user"
 
 
 class UserCreate(UserBase):
     password: str
 
 
-class UserUpdate(BaseModel):
-    first_name: Optional[str] = None
-    last_name: Optional[str] = None
+class UserUpdate(UserNameFields):
+    username: Optional[str] = None
     role: Optional[str] = None
     password: Optional[str] = None
 
@@ -91,7 +91,7 @@ class Chat(ChatBase):
 
 
 # Shallow types for safe responses
-class UserBasic(BaseModel):
+class UserBasic(UserNameFields):
     id: int
     username: str
 
@@ -120,12 +120,10 @@ class AdminLoginRequest(BaseModel):
     password: str
 
 
-class UserOut(BaseModel):
+class UserOut(UserNameFields):
     id: int
     username: str
     role: str
-    first_name: Optional[str] = None
-    last_name: Optional[str] = None
     signup_ip: Optional[str] = None
     signup_at: Optional[datetime.datetime] = None
 
@@ -142,7 +140,7 @@ class MachineOut(BaseModel):
     id: int
     ip_address: str
     # Return a shallow user to avoid recursive serialization
-    class _MachineUser(BaseModel):
+    class _MachineUser(UserNameFields):
         id: int
         username: str
 
@@ -181,7 +179,7 @@ class MessageOut(BaseModel):
     nonce: Optional[str] = None
     algo: Optional[str] = None
     recipient_id: Optional[int] = None
-    class _Sender(BaseModel):
+    class _Sender(UserNameFields):
         id: int
         username: str
         class Config:

@@ -6,8 +6,8 @@ import { RefreshCcw, LogOut, Settings } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { MdOutlineGroupAdd } from "react-icons/md";
 import { toast } from "sonner";
-
-type ChatParticipant = { id: number; username: string };
+import { ChatItem } from "./ChatItem";
+import type { ChatParticipant } from "@/types/chat";
 
 type Chat = {
   id: number;
@@ -78,53 +78,6 @@ export function ChatSidebar({
   unpinChat: (chatId: number) => Promise<void>;
 }) {
   const navigate = useNavigate();
-  const unifiedItems = useMemo(() => {
-    // Simple approach: convert sorted chats directly to display format
-    const chatItems: Array<{
-      kind: "group" | "private";
-      chatId?: number;
-      displayName: string;
-      userId?: number;
-    }> = [];
-
-    // First, add all chats in their sorted order (pinned first)
-    chats.forEach((chat) => {
-      chatItems.push({
-        kind: chat.chat_type as "group" | "private",
-        chatId: chat.id,
-        displayName:
-          chat.title ||
-          (chat.chat_type === "group"
-            ? `קבוצה #${chat.id}`
-            : `צ'אט פרטי #${chat.id}`),
-      });
-    });
-
-    // Then add approved users that don't have existing chats
-    approvedUsers.forEach((user) => {
-      if (!user.chat_id) {
-        chatItems.push({
-          kind: "private",
-          userId: user.user_id,
-          displayName: user.is_self ? "צ'אט עם עצמי" : user.username,
-          chatId: undefined,
-        });
-      }
-    });
-
-    let items =
-      filterTab === "groups"
-        ? chatItems.filter((item) => item.kind === "group")
-        : chatItems;
-
-    // Apply search filter
-    const q = search.trim().toLowerCase();
-    if (q) {
-      items = items.filter((it) => it.displayName.toLowerCase().includes(q));
-    }
-
-    return items;
-  }, [chats, approvedUsers, filterTab, search]);
 
   return (
     <aside className="border-l p-4 space-y-3 min-h-0 overflow-y-auto flex flex-col">
@@ -185,113 +138,127 @@ export function ChatSidebar({
               </>
             )}
             {!loading &&
-              unifiedItems.map((it) => {
-                const key =
-                  (it as any).kind === "group"
-                    ? `group-${(it as any).chatId}`
-                    : `private-${(it as any).userId}-${
-                        (it as any).chatId ?? "new"
-                      }`;
-                return (
-                  <li key={key}>
-                    <div className="group flex items-center gap-1">
-                      <Button
-                        variant={
-                          "chatId" in it &&
-                          (it as any).chatId &&
-                          activeChatId === (it as any).chatId
-                            ? "default"
-                            : "ghost"
+              chats
+                .filter((chat) => {
+                  // Apply filter tab
+                  if (filterTab === "groups" && chat.chat_type !== "group") {
+                    return false;
+                  }
+
+                  // Apply search filter
+                  if (search.trim()) {
+                    const q = search.trim().toLowerCase();
+                    if (chat.chat_type === "group") {
+                      return (
+                        chat.title?.toLowerCase().includes(q) ||
+                        chat.name?.toLowerCase().includes(q) ||
+                        `קבוצה #${chat.id}`.toLowerCase().includes(q)
+                      );
+                    } else {
+                      // For private chats, search in participant names
+                      const participant = chat.participants.find(
+                        (p) => p.id !== myId
+                      );
+                      if (participant) {
+                        const fullName = [
+                          participant.first_name,
+                          participant.last_name,
+                        ]
+                          .filter(Boolean)
+                          .join(" ");
+                        return (
+                          fullName.toLowerCase().includes(q) ||
+                          participant.username.toLowerCase().includes(q)
+                        );
+                      }
+                    }
+                    return false;
+                  }
+
+                  return true;
+                })
+                .map((chat) => {
+                  // Find the other user for private chats
+                  let otherUserId: number | undefined;
+                  if (chat.chat_type === "private" && myId) {
+                    const otherParticipant = chat.participants.find(
+                      (p) => p.id !== myId
+                    );
+                    otherUserId = otherParticipant?.id;
+                  }
+
+                  return (
+                    <li key={`chat-${chat.id}`}>
+                      <ChatItem
+                        chat={chat}
+                        isActive={activeChatId === chat.id}
+                        unreadCount={unreadMap[chat.id]}
+                        isOnline={
+                          otherUserId ? onlineIds.has(otherUserId) : false
                         }
-                        className="flex-1 justify-between"
-                        onClick={async () => {
-                          if ((it as any).kind === "group") {
-                            setActiveChatId((it as any).chatId);
-                          } else {
-                            const existing = (it as any).chatId;
-                            if (existing) {
-                              setActiveChatId(existing);
-                            } else {
-                              invalidateChatsCache();
-                              const chat = await createPrivateChat(
-                                token,
-                                (it as any).userId
-                              );
-                              setActiveChatId(chat.id);
-                              await loadChats();
-                            }
+                        onSelect={() => setActiveChatId(chat.id)}
+                        onPin={async () => {
+                          const success = await pinChat(chat.id);
+                          if (!success) {
+                            toast.error(
+                              `הגעת למקסימום צ'אטים מועדפים (${maxPinnedChats}). בטל נעיצה מצ'אט אחר כדי להוסיף חדש.`
+                            );
                           }
                         }}
-                      >
-                        <span className="inline-flex items-center gap-1">
-                          {(it as any).kind === "private" && (
-                            <span
-                              className={`ml-2 inline-block h-2 w-2 rounded-full ${
-                                onlineIds.has((it as any).userId)
-                                  ? "bg-emerald-500"
-                                  : "bg-gray-300"
-                              }`}
-                            />
-                          )}
-                          {it.displayName}
-                          {(it as any).kind === "group" ? " · קבוצה" : ""}
-                        </span>
-                        <span className="ml-2 text-xs text-muted-foreground">
-                          {"chatId" in it &&
-                          (it as any).chatId &&
-                          unreadMap[(it as any).chatId]
-                            ? unreadMap[(it as any).chatId]
-                            : ""}
-                        </span>
-                      </Button>
+                        onUnpin={async () => await unpinChat(chat.id)}
+                        isPinned={pinnedChatIds.includes(chat.id)}
+                        canPin={!pinnedChatIds.includes(chat.id)}
+                        maxPinnedChats={maxPinnedChats}
+                        currentPinnedCount={pinnedChatIds.length}
+                      />
+                    </li>
+                  );
+                })}
 
-                      {/* Pin/Unpin button - show on hover or always if pinned */}
-                      {(it as any).chatId && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className={`h-8 w-8 shrink-0 transition-opacity duration-200 ${
-                            pinnedChatIds.includes((it as any).chatId)
-                              ? "opacity-100" // Always visible if pinned
-                              : "opacity-0 group-hover:opacity-100" // Only on hover if not pinned
+            {/* Show approved users without existing chats */}
+            {!loading &&
+              approvedUsers
+                .filter((user) => !user.chat_id)
+                .filter((user) => {
+                  // Apply search filter
+                  if (search.trim()) {
+                    const q = search.trim().toLowerCase();
+                    if (user.is_self) {
+                      return "צ'אט עם עצמי".toLowerCase().includes(q);
+                    } else {
+                      return user.username.toLowerCase().includes(q);
+                    }
+                  }
+                  return true;
+                })
+                .map((user) => (
+                  <li key={`user-${user.user_id}`}>
+                    <Button
+                      variant="ghost"
+                      className="flex-1 justify-between w-full"
+                      onClick={async () => {
+                        invalidateChatsCache();
+                        const chat = await createPrivateChat(
+                          token,
+                          user.user_id
+                        );
+                        setActiveChatId(chat.id);
+                        await loadChats();
+                      }}
+                    >
+                      <span className="inline-flex items-center gap-1">
+                        <span
+                          className={`ml-2 inline-block h-2 w-2 rounded-full ${
+                            onlineIds.has(user.user_id)
+                              ? "bg-emerald-500"
+                              : "bg-gray-300"
                           }`}
-                          onClick={async (e) => {
-                            e.stopPropagation();
-                            const chatId = (it as any).chatId;
-                            if (pinnedChatIds.includes(chatId)) {
-                              await unpinChat(chatId);
-                            } else {
-                              const success = await pinChat(chatId);
-                              if (!success) {
-                                toast.error(
-                                  `הגעת למקסימום צ'אטים מועדפים (${maxPinnedChats}). בטל נעיצה מצ'אט אחר כדי להוסיף חדש.`
-                                );
-                              }
-                            }
-                          }}
-                          title={
-                            pinnedChatIds.includes((it as any).chatId)
-                              ? "בטל נעיצה"
-                              : `נעוץ צ'אט (${
-                                  maxPinnedChats - pinnedChatIds.length
-                                } נותרו)`
-                          }
-                        >
-                          <span
-                            className={`text-sm ${
-                              pinnedChatIds.includes((it as any).chatId)
-                                ? "text-blue-500"
-                                : "text-muted-foreground"
-                            }`}
-                          >
-                            📌
-                          </span>
-                        </Button>
-                      )}
-                    </div>
+                        />
+                        {user.is_self ? "צ'אט עם עצמי" : user.username}
+                      </span>
+                    </Button>
                   </li>
-                );
-              })}
+                ))}
           </ul>
         </CardContent>
       </Card>
